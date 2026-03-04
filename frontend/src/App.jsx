@@ -4,6 +4,7 @@ function App() {
   const [clients, setClients] = useState([]);
   
   // Estados para la lógica del formulario
+  const [showForm, setShowForm] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [currentClient, setCurrentClient] = useState({ name: '', email: '', phone: '' });
 
@@ -18,12 +19,13 @@ function App() {
     setClients(clients.filter(client => client.id !== id));
   };
 
-  const openEditModal = (client) => {
+const openEditModal = (client) => {
     setIsEditing(true);
     setCurrentClient(client);
+    setShowForm(true); // <--- IMPORTANTE: Abre el formulario al editar
   };
 
-  const updateClient = async (e) => {
+const updateClient = async (e) => {
     e.preventDefault();
     const res = await fetch(`http://localhost:3000/clients/${currentClient.id}`, {
       method: "PUT",
@@ -33,18 +35,41 @@ function App() {
 
     if (res.ok) {
       setClients(clients.map(c => c.id === currentClient.id ? currentClient : c));
+      setShowForm(false); // <--- Cerramos formulario
       setIsEditing(false);
+    }
+  };
+
+  const createClient = async (e) => {
+    e.preventDefault();
+    const res = await fetch("http://localhost:3000/clients", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(currentClient)
+    });
+
+    if (res.ok) {
+      const newClient = await res.json();
+      setClients([newClient, ...clients]);
+      setCurrentClient({ name: '', email: '', phone: '' });
+      setShowForm(false); // <--- Cerramos formulario
     }
   };
 
   return (
     <div>
       <h1>CRM Clientes</h1>
-      <button>+ Nuevo Cliente</button>
+     <button onClick={() => {
+  setIsEditing(false); 
+  setCurrentClient({ name: '', email: '', phone: '' }); 
+  setShowForm(true); // <-- Aparece formulario
+}}>
+  + Nuevo Cliente
+</button>
 
       {/* Formulario de Edición Simple POR AHORA */}
-      {isEditing && (
-        <form onSubmit={updateClient}>
+      {showForm && (
+<form onSubmit={isEditing ? updateClient : createClient}>          
           <input 
             value={currentClient.name} 
             onChange={(e) => setCurrentClient({...currentClient, name: e.target.value})} 
@@ -58,7 +83,7 @@ function App() {
             onChange={(e) => setCurrentClient({...currentClient, phone: e.target.value})} 
           />
           <button type="submit">Guardar</button>
-          <button type="button" onClick={() => setIsEditing(false)}>Cancelar</button>
+          <button type="button" onClick={() => setShowForm(false)}>Cancelar</button>
         </form>
       )}
 
