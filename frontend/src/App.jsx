@@ -11,16 +11,40 @@ function App() {
     email: "",
     phone: "",
   });
+  const [alert, setAlert] = useState({ message: "", type: "" });
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [loading, setLoading] = useState(false);
 
+  const showAlert = (message, type) => {
+    setAlert({ message, type });
+    setAlertVisible(true);
+
+    setTimeout(() => {
+      setAlertVisible(false);
+      setTimeout(() => setAlert({ message: "", type: "" }), 300); // espera fade out
+    }, 3000);
+  };
   useEffect(() => {
     fetch("http://localhost:3000/clients")
       .then((res) => res.json())
       .then((data) => setClients(data));
   }, []);
 
+  // Borrar un cliente
   const deleteClient = async (id) => {
-    await fetch(`http://localhost:3000/clients/${id}`, { method: "DELETE" });
-    setClients(clients.filter((client) => client.id !== id));
+    try {
+      setLoading(true);
+      const res = await fetch(`http://localhost:3000/clients/${id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error("No se pudo eliminar el cliente");
+      setClients(clients.filter((client) => client.id !== id));
+      showAlert("Cliente eliminado con éxito", "success");
+    } catch (error) {
+      showAlert(error.message || "Error al eliminar cliente", "error");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const openEditModal = (client) => {
@@ -29,39 +53,57 @@ function App() {
     setShowForm(true); // <--- IMPORTANTE: Abre el formulario al editar
   };
 
+  // Actualizar un cliente existente
   const updateClient = async (e) => {
     e.preventDefault();
-    const res = await fetch(
-      `http://localhost:3000/clients/${currentClient.id}`,
-      {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(currentClient),
-      },
-    );
+    try {
+      setLoading(true);
+      const res = await fetch(
+        `http://localhost:3000/clients/${currentClient.id}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(currentClient),
+        },
+      );
 
-    if (res.ok) {
+      if (!res.ok) throw new Error("No se pudo actualizar el cliente");
+
       setClients(
         clients.map((c) => (c.id === currentClient.id ? currentClient : c)),
       );
       setShowForm(false); // <--- Cerramos formulario
       setIsEditing(false);
+      showAlert("Cliente actualizado con éxito", "success");
+    } catch (error) {
+      showAlert(error.message || "Error al actualizar cliente", "error");
+    } finally {
+      setLoading(false);
     }
   };
 
+  // Crear un nuevo cliente
   const createClient = async (e) => {
     e.preventDefault();
-    const res = await fetch("http://localhost:3000/clients", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(currentClient),
-    });
+    try {
+      setLoading(true);
+      const res = await fetch("http://localhost:3000/clients", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(currentClient),
+      });
 
-    if (res.ok) {
+      if (!res.ok) throw new Error("No se pudo crear el cliente");
+
       const newClient = await res.json();
       setClients([newClient, ...clients]);
       setCurrentClient({ name: "", email: "", phone: "" });
       setShowForm(false); // <--- Cerramos formulario
+      showAlert("Cliente creado con éxito", "success");
+    } catch (error) {
+      showAlert(error.message || "Error al crear cliente", "error");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -71,16 +113,36 @@ function App() {
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold">CRM Clientes</h1>
           <button
-            className="bg-blue-600 text-white px-4 py-2 rounded shadow"
+            className="bg-blue-600 text-white px-4 py-2 rounded shadow disabled:opacity-50"
             onClick={() => {
               setIsEditing(false);
               setCurrentClient({ name: "", email: "", phone: "" });
               setShowForm(true);
             }}
+            disabled={loading}
           >
             + Nuevo Cliente
           </button>
         </div>
+
+        {/* Alerta de mensajes de éxito o error con estilo Toast Flotante */}
+        {alert.message && (
+          <div className="fixed top-6 right-6 z-50">
+            <div
+              className={`px-5 py-3 rounded-lg shadow-lg border transition-all duration-300 ${
+                alertVisible
+                  ? "opacity-100 translate-y-0"
+                  : "opacity-0 -translate-y-3"
+              } ${
+                alert.type === "success"
+                  ? "bg-green-50 border-green-300 text-green-800"
+                  : "bg-red-50 border-red-300 text-red-800"
+              }`}
+            >
+              {alert.message}
+            </div>
+          </div>
+        )}
 
         {/* Formulario de Edición Simple POR AHORA */}
         {showForm && (
@@ -135,7 +197,8 @@ function App() {
                 </button>
                 <button
                   type="submit"
-                  className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-md font-bold transition-colors"
+                  disabled={loading}
+                  className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-md font-bold transition-colors disabled:opacity-50"
                 >
                   {isEditing ? "Actualizar" : "Guardar Cliente"}
                 </button>
@@ -144,7 +207,7 @@ function App() {
           </div>
         )}
 
-        {/* Contenedor de la tabla: da el fondo blanco, bordes redondeados y sombra */}
+        {/* Contenedor de la tabla: fondo blanco, bordes redondeados y sombra */}
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
           <table className="w-full text-left border-collapse">
             {/* Encabezado con fondo gris suave */}
